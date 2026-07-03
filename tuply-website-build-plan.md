@@ -110,14 +110,16 @@ If you want a single accent later (a lot of Vercel/Linear-style brands eventuall
 
 | Layer | Choice | Why |
 |---|---|---|
-| Framework | **Next.js (App Router) + TypeScript** | Server-rendered for fast first paint and strong SEO, which your brief explicitly calls for; scales cleanly toward the dashboards/portals mentioned in "Long-Term Vision" |
+| Frontend | **React + TypeScript + Vite** | Fast dev server, lightweight, full control over routing and rendering; pairs cleanly with a separate backend |
 | Styling | **Tailwind CSS + shadcn/ui** (Radix primitives underneath) | Fast to iterate on with an AI agent, accessible defaults out of the box, easy to keep strictly to your token system instead of drifting |
 | Motion | **Framer Motion**, used sparingly per §4 | Handles scroll reveals and hover states without hand-rolled CSS animation |
-| Content | MDX or typed TypeScript data files (`/content/services.ts`, `/content/industries.ts`) to start | No CMS overhead for a site this size at launch; swap for a headless CMS (Sanity/Contentful) in Phase 2 once there's a marketing hire who isn't touching code |
-| Forms | A serverless route (`/app/api/contact/route.ts`) posting to Resend or a similar transactional email API | Keeps the contact form off third-party embeds that clash with the visual design |
-| Hosting | **Vercel** | It's literally in your own design-inspiration list, it's built for Next.js specifically, and preview deployments per PR are genuinely useful for a small team reviewing an AI agent's output |
-| Fonts | `next/font` with Geist / Geist Mono | Self-hosted, zero layout shift, no external font request |
-| Analytics | Vercel Analytics or Plausible | Privacy-respecting, no cookie-consent banner needed, fits a "no clutter" homepage |
+| Routing | **React Router v6** | Client-side routing for the multi-page sitemap in §6 |
+| Content | Typed TypeScript data files (`/src/content/services.ts`, `/src/content/industries.ts`) to start | No CMS overhead for a site this size at launch; swap for a headless CMS (Sanity/Contentful) in Phase 2 |
+| Backend | **FastAPI (Python)** | Handles the contact form endpoint, email dispatch via Resend, and any future API routes (AI demos, lead capture); clean async support, auto-generated OpenAPI docs |
+| Forms | React form posting to `POST /api/contact` on the FastAPI backend, validated with Pydantic on the server | Keeps the contact form off third-party embeds that clash with the visual design |
+| Fonts | Google Fonts or self-hosted Geist / Geist Mono loaded via CSS `@font-face` | Zero layout shift with `font-display: swap` |
+| Hosting | **Vercel** (frontend) + **Railway / Render** (FastAPI backend) | Vercel is in your design-inspiration list and handles the React build; Railway/Render gives a simple always-on Python service with zero DevOps overhead |
+| Analytics | Plausible or Vercel Analytics (script tag) | Privacy-respecting, no cookie-consent banner needed, fits a "no clutter" homepage |
 
 ---
 
@@ -196,10 +198,22 @@ First launch walks you through browser-based sign-in — a free **AWS Builder ID
 
 **Project scaffold:**
 ```bash
-npx create-next-app@latest tuply-website --typescript --tailwind --app --src-dir --import-alias "@/*"
+# Frontend
+npm create vite@latest tuply-website -- --template react-ts
 cd tuply-website
-git init && git add -A && git commit -m "chore: scaffold"
+npm install
+npm install -D tailwindcss postcss autoprefixer && npx tailwindcss init -p
+npm install framer-motion react-router-dom
 npx shadcn@latest init
+
+# Backend
+cd ..
+mkdir tuply-api && cd tuply-api
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install fastapi uvicorn[standard] pydantic resend python-dotenv
+# create main.py as the FastAPI entry point
+
+git init && git add -A && git commit -m "chore: scaffold"
 ```
 
 Open the resulting folder in Cursor IDE, then run `cursor-agent` and `kiro-cli chat` from its integrated terminal for everything that follows.
@@ -260,9 +274,11 @@ making the client more money, saving time, or improving customer experience.
 inclusion: always
 ---
 # tuply. — stack
-Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion
-(sparingly), next/font with Geist/Geist Mono. Content lives in typed
-TS/MDX files, not a database, at this stage. Hosted on Vercel.
+Frontend: React + TypeScript + Vite, Tailwind CSS, shadcn/ui, Framer Motion
+(sparingly), React Router v6. Fonts loaded via CSS @font-face (Geist/Geist Mono).
+Content lives in typed TS files under /src/content/, not a database, at this stage.
+Backend: FastAPI (Python), Pydantic validation, Resend for email, uvicorn server.
+Frontend hosted on Vercel; backend hosted on Railway or Render.
 ```
 
 `brand.md`:
@@ -291,18 +307,19 @@ Each phase names a primary tool. Prompts are written the way you'd actually past
 ### Phase 0 — Foundation
 *Primary: Cursor CLI*
 ```
-Set up the base layout for a Next.js App Router project: root layout with
-Geist and Geist Mono via next/font, a design-tokens.css (or tailwind.config)
-implementing the color/type/spacing scale in .cursor/rules/brand.mdc, a
-Header and Footer component, and a placeholder favicon using a single dot
-shape. No page content yet — just the shell every page will use.
+Set up the base layout for a React + Vite project: configure Tailwind with
+the design tokens in .cursor/rules/brand.mdc, set up React Router with a
+root layout component wrapping Header and Footer, load Geist and Geist Mono
+via CSS @font-face, and add a placeholder favicon using a single dot shape.
+Also scaffold the FastAPI backend: a main.py with a health-check route and
+a /api/contact POST route stub. No page content yet — just the shell.
 ```
-Done when: every future page can extend one shared layout, and the tokens exist in one place instead of being repeated per component.
+Done when: every future page can extend one shared layout, tokens exist in one place, and the FastAPI server runs locally with `uvicorn main:app --reload`.
 
 ### Phase 1 — Home page
 *Primary: Cursor CLI, reviewed with Kiro CLI*
 ```
-Build the home page at app/page.tsx using the ten sections described in
+Build the home page at src/pages/Home.tsx using the ten sections described in
 tuply's home-page plan: nav, hero with the animated-dot signature, trust
 strip, 6-card services grid, 3-card industries strip, 3-step process,
 philosophy pull-quote, FAQ accordion, final CTA band, footer. Use the
@@ -311,7 +328,7 @@ description, no filler.
 ```
 Then, in Kiro CLI:
 ```
-Review app/page.tsx and its components for accessibility (labelled
+Review src/pages/Home.tsx and its components for accessibility (labelled
 landmarks, focus order, color contrast against design-tokens), and flag
 anywhere copy uses a banned word from .kiro/steering/brand.md.
 ```
@@ -320,9 +337,9 @@ anywhere copy uses a banned word from .kiro/steering/brand.md.
 *Primary: Cursor CLI*
 Repeat the same pattern per page, pointing at the sitemap in §6 and the relevant brief section (Core Services / Target Industries / Vision-Mission-Values) as source content. For Contact specifically:
 ```
-Build the contact page: a form (name, company, industry select, budget
-range, message) posting to app/api/contact/route.ts, which sends via
-[Resend/your provider]. Validate with zod. Show a confirmation state that
+Build the contact page: a React form (name, company, industry select, budget
+range, message) posting to POST /api/contact on the FastAPI backend. Validate
+on the server with Pydantic; send via Resend. Show a confirmation state that
 matches the site's monochrome design, not a generic browser alert.
 ```
 
@@ -385,7 +402,8 @@ Blog/Insights section, individual industry sub-pages, case studies once real cli
 ## 13. Deployment checklist
 
 - [ ] Push the repo to GitHub (private is fine to start)
-- [ ] Connect the repo in Vercel; confirm the framework preset auto-detects Next.js
+- [ ] Connect the frontend repo in Vercel; set the build command to `npm run build` and output directory to `dist`
+- [ ] Deploy the FastAPI backend to Railway or Render; set the start command to `uvicorn main:app --host 0.0.0.0 --port $PORT`
 - [ ] Set environment variables (email API key, analytics ID) in Vercel's dashboard, not committed to the repo
 - [ ] Point your registered domain's DNS at Vercel
 - [ ] Verify every page in §6 that's in Phase 1 is live and linked from the nav/footer
