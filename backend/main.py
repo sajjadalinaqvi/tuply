@@ -11,7 +11,12 @@ app = FastAPI(title="tuply. API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:5173")],
+    allow_origins=[
+        os.getenv("FRONTEND_URL", "http://localhost:3000"),
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:5173",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -21,8 +26,6 @@ class ContactForm(BaseModel):
     name: str
     company: str
     email: EmailStr
-    industry: str
-    budget: str
     message: str
 
 
@@ -43,8 +46,6 @@ async def contact(form: ContactForm):
             <p><strong>Name:</strong> {form.name}</p>
             <p><strong>Company:</strong> {form.company}</p>
             <p><strong>Email:</strong> {form.email}</p>
-            <p><strong>Industry:</strong> {form.industry}</p>
-            <p><strong>Budget:</strong> {form.budget}</p>
             <p><strong>Message:</strong><br>{form.message}</p>
         """,
     })
